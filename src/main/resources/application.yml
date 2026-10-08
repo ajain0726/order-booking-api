@@ -10,6 +10,8 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema.sql
+      # Demo traders T001-T003; set to empty to start with an empty database.
+      data-locations: classpath:data.sql
   jpa:
     open-in-view: false
     hibernate:

@@ -9,7 +9,7 @@ analysed for overlap with benchmark baskets.
 Requirements: JDK 17 or newer, Maven 3.9+.
 
 ```bash
-mvn test                      # 67 tests: unit, service, concurrency, HTTP
+mvn test                      # 70 tests: unit, service, concurrency, HTTP
 mvn spring-boot:run           # starts on http://localhost:8080
 # or
 mvn package && java -jar target/order-booking-api-1.0.0.jar
@@ -19,6 +19,32 @@ The app uses an in-memory H2 database (PostgreSQL mode) initialised from
 `src/main/resources/schema.sql` on startup. The H2 console is at
 `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:trading`, user `sa`, no password).
 `requests.http` contains a ready-to-run walkthrough (IntelliJ / VS Code REST Client).
+
+### Demo data
+
+`src/main/resources/data.sql` seeds three traders on startup so every endpoint returns
+something immediately:
+
+| Trader | Holdings | Orders | Overlap |
+|---|---|---|---|
+| `T001` | AAPL 150, TSLA 80, NVDA 100 (TECH) | #1 BUY AAPL 150 FILLED, #2 BUY MSFT 20 PENDING, #3 SELL AAPL 50 PENDING | TECH_HEAVY 75%, HIGH |
+| `T002` | JPM 200, GS 50, BAC 120 (FINANCE) | #4 BUY WFC 100 PENDING, #5 SELL GS 10 CANCELLED | FINANCE_HEAVY 75%, HIGH |
+| `T003` | XOM 90 (ENERGY), JNJ 30 (HEALTHCARE) | none | BALANCED 57.14%, MEDIUM |
+
+The inserts are guarded with `NOT EXISTS`, so re-running the script is harmless. Start
+with an empty database instead with `--spring.sql.init.data-locations=`.
+
+### Adding a trader
+
+The spec defines no "create trader" endpoint, so there isn't one: a trader is created
+automatically the first time any request names it. Either of these creates `T004`:
+
+```bash
+curl -X POST localhost:8080/api/v1/traders/T004/portfolio/holdings -H 'Content-Type: application/json' \
+  -d '{"stock":"AAPL","sector":"TECH","quantity":10}'
+curl -X POST localhost:8080/api/v1/orders -H 'Content-Type: application/json' \
+  -d '{"traderId":"T004","stock":"AAPL","sector":"TECH","quantity":10,"side":"BUY"}'
+```
 
 ## Endpoints
 
@@ -33,14 +59,13 @@ The app uses an in-memory H2 database (PostgreSQL mode) initialised from
 | – | `GET /api/v1/orders/{id}` | Read one order (convenience) | 200 |
 
 ```bash
-curl -X POST localhost:8080/api/v1/orders -H 'Content-Type: application/json' \
-  -d '{"traderId":"T001","stock":"AAPL","sector":"TECH","quantity":150,"side":"BUY"}'
-curl -X POST localhost:8080/api/v1/orders/1/fill
-curl -X POST localhost:8080/api/v1/traders/T001/portfolio/holdings -H 'Content-Type: application/json' \
-  -d '{"stock":"TSLA","sector":"TECH","quantity":80}'
+# Against the demo data (see below):
 curl localhost:8080/api/v1/traders/T001/portfolio
-# {"traderId":"T001","positions":{"AAPL":150,"TSLA":80},"sectorBreakdown":{"TECH":230}}
+# {"traderId":"T001","positions":{"AAPL":150,"NVDA":100,"TSLA":80},"sectorBreakdown":{"TECH":330}}
 curl localhost:8080/api/v1/traders/T001/portfolio/overlap
+curl -X POST localhost:8080/api/v1/orders/2/fill          # seeded PENDING BUY MSFT 20
+curl -X POST localhost:8080/api/v1/orders -H 'Content-Type: application/json' \
+  -d '{"traderId":"T005","stock":"AAPL","sector":"TECH","quantity":150,"side":"BUY"}'
 ```
 
 ### Errors
@@ -132,7 +157,7 @@ I/O. `SectorOverlapAnalyzer` takes a `Set<String>` of tickers and returns an imm
 * **Rich domain objects.** `Order.markFilled()/markCancelled()` own the state machine
   and `Holding.decrease()` refuses to go negative, so services cannot bypass the rules.
 * **Traders and stocks are registered on first use.** The spec has no endpoints to
-  create them. `ReferenceDataRegistrar` inserts in its own short transaction *before*
+  create them, so adding one would be API surface nobody asked for. `ReferenceDataRegistrar` inserts in its own short transaction *before*
   the main one; if two first requests race, the loser catches the unique-key violation
   and uses the winner's row. Running it before (not inside) the main transaction
   avoids needing two pooled connections per request.
@@ -191,6 +216,7 @@ I/O. `SectorOverlapAnalyzer` takes a `Set<String>` of tickers and returns an imm
 | `PortfolioServiceTest` | Service + H2 | Spec portfolio example, multi-sector breakdown, unknown trader, overlap from holdings |
 | `ConcurrencyTest` | 16 threads, start gate | Limit, overselling, double fill, fill-vs-cancel, lost updates, first-use registration race |
 | `ApiTest` | MockMvc | All endpoints, status codes, error body, validation details |
+| `SeedDataTest` | MockMvc | Demo traders load with the documented holdings, orders and risk |
 
 Note: `pom.xml` loads Mockito's Byte Buddy agent via `-javaagent` for tests. JDK 21+
 warns about (and some sandboxes block) the dynamic self-attach Mockito otherwise uses.

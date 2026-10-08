@@ -1,35 +1,40 @@
-### 1. Place a BUY order
-POST http://localhost:8080/api/v1/orders
-Content-Type: application/json
+# Walkthrough against the demo data in data.sql (fresh start).
 
-{ "traderId": "T001", "stock": "AAPL", "sector": "TECH", "quantity": 150, "side": "BUY" }
-
-### 2. Fill it
-POST http://localhost:8080/api/v1/orders/1/fill
-
-### 3. Cancelling a FILLED order -> 409 INVALID_ORDER_STATE
-POST http://localhost:8080/api/v1/orders/1/cancel
-
-### 6. Add holdings directly
-POST http://localhost:8080/api/v1/traders/T001/portfolio/holdings
-Content-Type: application/json
-
-{ "stock": "TSLA", "sector": "TECH", "quantity": 80 }
-
-### 4. Portfolio -> positions AAPL 150, TSLA 80; TECH 230
+### 4. Portfolio of seeded trader T001 -> AAPL 150, NVDA 100, TSLA 80; TECH 330
 GET http://localhost:8080/api/v1/traders/T001/portfolio
-
-### 6. Add NVDA so the portfolio matches the worked example
-POST http://localhost:8080/api/v1/traders/T001/portfolio/holdings
-Content-Type: application/json
-
-{ "stock": "NVDA", "sector": "TECH", "quantity": 100 }
 
 ### 5. Overlap -> TECH_HEAVY 75.00%, FINANCE_HEAVY 0.00%, BALANCED 50.00%, HIGH
 GET http://localhost:8080/api/v1/traders/T001/portfolio/overlap
+
+### 2. Fill seeded PENDING order #2 (BUY MSFT 20) -> MSFT appears in T001's portfolio
+POST http://localhost:8080/api/v1/orders/2/fill
+
+### 3. Cancel seeded PENDING order #3 (SELL AAPL 50)
+POST http://localhost:8080/api/v1/orders/3/cancel
+
+### 3. Cancelling FILLED order #1 -> 409 INVALID_ORDER_STATE
+POST http://localhost:8080/api/v1/orders/1/cancel
+
+### 1. Place a BUY order for a brand-new trader (created automatically)
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+
+{ "traderId": "T004", "stock": "AAPL", "sector": "TECH", "quantity": 50, "side": "BUY" }
+
+### 6. Add holdings directly
+POST http://localhost:8080/api/v1/traders/T004/portfolio/holdings
+Content-Type: application/json
+
+{ "stock": "NVDA", "sector": "TECH", "quantity": 100 }
 
 ### SELL more than held -> 422 INSUFFICIENT_HOLDINGS
 POST http://localhost:8080/api/v1/orders
 Content-Type: application/json
 
-{ "traderId": "T001", "stock": "AAPL", "sector": "TECH", "quantity": 500, "side": "SELL" }
+{ "traderId": "T003", "stock": "XOM", "sector": "ENERGY", "quantity": 500, "side": "SELL" }
+
+### Pending limit: T002 starts with 1 PENDING order; send this 3 times and the 3rd gets 422
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+
+{ "traderId": "T002", "stock": "MS", "sector": "FINANCE", "quantity": 5, "side": "BUY" }
