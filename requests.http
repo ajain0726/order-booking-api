@@ -1,0 +1,35 @@
+### 1. Place a BUY order
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+
+{ "traderId": "T001", "stock": "AAPL", "sector": "TECH", "quantity": 150, "side": "BUY" }
+
+### 2. Fill it
+POST http://localhost:8080/api/v1/orders/1/fill
+
+### 3. Cancelling a FILLED order -> 409 INVALID_ORDER_STATE
+POST http://localhost:8080/api/v1/orders/1/cancel
+
+### 6. Add holdings directly
+POST http://localhost:8080/api/v1/traders/T001/portfolio/holdings
+Content-Type: application/json
+
+{ "stock": "TSLA", "sector": "TECH", "quantity": 80 }
+
+### 4. Portfolio -> positions AAPL 150, TSLA 80; TECH 230
+GET http://localhost:8080/api/v1/traders/T001/portfolio
+
+### 6. Add NVDA so the portfolio matches the worked example
+POST http://localhost:8080/api/v1/traders/T001/portfolio/holdings
+Content-Type: application/json
+
+{ "stock": "NVDA", "sector": "TECH", "quantity": 100 }
+
+### 5. Overlap -> TECH_HEAVY 75.00%, FINANCE_HEAVY 0.00%, BALANCED 50.00%, HIGH
+GET http://localhost:8080/api/v1/traders/T001/portfolio/overlap
+
+### SELL more than held -> 422 INSUFFICIENT_HOLDINGS
+POST http://localhost:8080/api/v1/orders
+Content-Type: application/json
+
+{ "traderId": "T001", "stock": "AAPL", "sector": "TECH", "quantity": 500, "side": "SELL" }

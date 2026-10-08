@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: order-booking-api
+  datasource:
+    # LOCK_TIMEOUT: wait up to 10s for a per-trader row lock under contention.
+    url: jdbc:h2:mem:trading;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+trading:
+  max-pending-orders-per-trader: 3
+
+logging:
+  level:
+    root: INFO
+    com.fynxt.trading: DEBUG
