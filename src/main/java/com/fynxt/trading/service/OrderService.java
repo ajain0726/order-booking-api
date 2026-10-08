@@ -50,9 +50,8 @@ public class OrderService {
         this.registrar = registrar;
         this.traderLock = traderLock;
         this.properties = properties;
-        this.tx = new TransactionTemplate(transactionManager);
-        this.readOnlyTx = new TransactionTemplate(transactionManager);
-        this.readOnlyTx.setReadOnly(true);
+        this.tx = Transactions.readCommitted(transactionManager);
+        this.readOnlyTx = Transactions.readOnly(transactionManager);
     }
 
     public Order placeOrder(PlaceOrderCommand command) {

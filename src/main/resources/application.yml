@@ -2,8 +2,10 @@ spring:
   application:
     name: order-booking-api
   datasource:
+    # Default: embedded H2 in MySQL mode, so the app runs with nothing installed.
+    # Run against real MySQL with the "mysql" profile (see application-mysql.yml).
     # LOCK_TIMEOUT: wait up to 10s for a per-trader row lock under contention.
-    url: jdbc:h2:mem:trading;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
+    url: jdbc:h2:mem:trading;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
     username: sa
     password:
   sql:

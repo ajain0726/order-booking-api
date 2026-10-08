@@ -32,7 +32,7 @@ public class ReferenceDataRegistrar {
                                   PlatformTransactionManager transactionManager) {
         this.traderRepository = traderRepository;
         this.stockRepository = stockRepository;
-        this.tx = new TransactionTemplate(transactionManager);
+        this.tx = Transactions.readCommitted(transactionManager);
     }
 
     public void ensureTrader(String traderId) {

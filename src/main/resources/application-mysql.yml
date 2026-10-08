@@ -1,0 +1,10 @@
+# Real MySQL 8. Start one with `docker compose up -d`, then run with
+#   mvn spring-boot:run -Dspring-boot.run.profiles=mysql
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/trading?createDatabaseIfNotExist=true}
+    username: ${DB_USER:trading}
+    password: ${DB_PASSWORD:trading}
+  h2:
+    console:
+      enabled: false

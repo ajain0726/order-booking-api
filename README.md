@@ -9,15 +9,30 @@ analysed for overlap with benchmark baskets.
 Requirements: JDK 17 or newer, Maven 3.9+.
 
 ```bash
-mvn test                      # 70 tests: unit, service, concurrency, HTTP
-mvn spring-boot:run           # starts on http://localhost:8080
+mvn test                      # 101 tests; the 31 MySQL ones need Docker (skipped without it)
+mvn spring-boot:run           # starts on http://localhost:8080 with an embedded database
 # or
 mvn package && java -jar target/order-booking-api-1.0.0.jar
 ```
 
-The app uses an in-memory H2 database (PostgreSQL mode) initialised from
-`src/main/resources/schema.sql` on startup. The H2 console is at
-`http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:trading`, user `sa`, no password).
+### Database: MySQL
+
+The schema targets **MySQL 8** (`src/main/resources/schema.sql`). There are two ways to run:
+
+| | Command | Database |
+|---|---|---|
+| Quick start (default) | `mvn spring-boot:run` | Embedded H2 in **MySQL compatibility mode**, in memory. Nothing to install; data resets on restart. Console at `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:trading`, user `sa`, no password). |
+| Real MySQL | `docker compose up -d` then `mvn spring-boot:run -Dspring-boot.run.profiles=mysql` | MySQL 8.4 from `docker-compose.yml` on `localhost:3306`, database/user/password `trading`. Data survives restarts. |
+
+To use your own MySQL instead of Docker, create a database and run with the `mysql` profile and
+`DB_URL`, `DB_USER`, `DB_PASSWORD` environment variables
+(e.g. `DB_URL=jdbc:mysql://localhost:3306/trading`). The schema and demo data are applied on
+startup and are safe to re-run.
+
+**Why H2 by default and MySQL for real?** Reviewers can run the app with one command and no
+database install, while the same `schema.sql` runs on real MySQL. H2's MySQL mode is not a
+perfect copy of MySQL (locking and isolation differ), so the business-rule and concurrency
+tests also run against a real MySQL 8.4 in Docker via Testcontainers (`MySql*Test`).
 `requests.http` contains a ready-to-run walkthrough (IntelliJ / VS Code REST Client).
 
 ### Demo data
@@ -122,6 +137,14 @@ write for a trader first runs `SELECT … FOR UPDATE` on that trader's row
 * **Fill/cancel load the order only after the lock.** `findTraderIdById` is a scalar
   query, so the order entity is read fresh once the lock is held; a racing fill and
   cancel cannot both see PENDING.
+* **READ COMMITTED isolation, set explicitly.** MySQL/InnoDB defaults to REPEATABLE READ,
+  where a plain `SELECT` reads from a snapshot taken at the transaction's first read.
+  Fill/cancel read the order's trader id *before* taking the lock, so under REPEATABLE READ
+  the order re-read after the lock could still show PENDING for an order another request
+  just filled. Every write transaction therefore runs at READ COMMITTED
+  (`service/Transactions.java`). This is not theoretical: with the default isolation,
+  `MySqlConcurrencyTest` fails (orders filled more than once); with READ COMMITTED it
+  passes. H2 defaults to READ COMMITTED, which is why the H2 tests could not catch it.
 * **The DB is the final safety net.** `CHECK (quantity >= 0)` on holdings and the
   status/side CHECKs reject anything the application logic ever missed.
 
@@ -129,6 +152,7 @@ write for a trader first runs `SELECT … FOR UPDATE` on that trader's row
 orders become PENDING, SELLs never exceed holdings, an order is filled exactly once,
 a fill/cancel race has one winner, and concurrent additions are not lost. With the
 lock swapped for a plain read, 11 of its 13 runs fail; with it, all pass.
+`MySqlConcurrencyTest` runs the same cases against real MySQL.
 
 **Alternative considered: optimistic locking (`@Version`) with retry.** It scales
 better under low contention, but the pending-limit rule is an invariant over a *set*
@@ -188,9 +212,11 @@ I/O. `SectorOverlapAnalyzer` takes a `Set<String>` of tickers and returns an imm
 
 ## Trade-offs and things intentionally skipped
 
-* **H2 instead of a standalone database.** Zero setup for reviewers. `schema.sql` is
-  portable SQL and H2 runs in PostgreSQL mode, so switching is a datasource change
-  plus the `org.postgresql:postgresql` driver. Not tested against a real PostgreSQL here.
+* **H2 as the default runtime database.** Zero setup for reviewers. The production target
+  is MySQL (`mysql` profile), and the tests that depend on database behaviour also run
+  against real MySQL via Testcontainers.
+* **Enums stored as VARCHAR + CHECK, not MySQL `ENUM`.** Adding a status later is then a
+  constraint change rather than a column-type change, and the schema stays portable.
 * **No migration tool (Flyway/Liquibase).** The deliverable is a single `schema.sql`;
   in production I would put it under Flyway as `V1__init.sql`. Hibernate runs with
   `ddl-auto=validate`, so entity/schema drift fails at startup.
@@ -198,9 +224,10 @@ I/O. `SectorOverlapAnalyzer` takes a `Set<String>` of tickers and returns an imm
   from the authenticated principal, not the request body.
 * **No idempotency keys.** A retried `POST /orders` creates a second order. A client-supplied
   `Idempotency-Key` with a unique constraint would fix this.
-* **No pagination/listing of orders, no OpenAPI UI, no Docker image.** Not asked for; kept
+* **No pagination/listing of orders, no OpenAPI UI, no Docker image of the app.** Not asked for; kept
   the dependency set minimal.
-* **Lock wait.** H2 `LOCK_TIMEOUT` is 10 s. If exceeded, the client gets a retryable
+* **Lock wait.** H2 `LOCK_TIMEOUT` is 10 s; on MySQL it is InnoDB's
+  `innodb_lock_wait_timeout` (50 s by default). If exceeded, the client gets a retryable
   409 `CONCURRENT_MODIFICATION`.
 * **Service tests use the real (in-memory) database** rather than mocks, because the
   behaviour under test (row locks, constraints, aggregate queries) lives in the database.
@@ -217,6 +244,9 @@ I/O. `SectorOverlapAnalyzer` takes a `Set<String>` of tickers and returns an imm
 | `ConcurrencyTest` | 16 threads, start gate | Limit, overselling, double fill, fill-vs-cancel, lost updates, first-use registration race |
 | `ApiTest` | MockMvc | All endpoints, status codes, error body, validation details |
 | `SeedDataTest` | MockMvc | Demo traders load with the documented holdings, orders and risk |
+| `MySqlOrderServiceTest`, `MySqlConcurrencyTest`, `MySqlSeedDataTest` | Testcontainers, MySQL 8.4 | The three classes above re-run against real MySQL; skipped automatically when Docker is not available |
+
+Testcontainers is pinned to 1.21.4 because older releases cannot talk to Docker Engine 29+.
 
 Note: `pom.xml` loads Mockito's Byte Buddy agent via `-javaagent` for tests. JDK 21+
 warns about (and some sandboxes block) the dynamic self-attach Mockito otherwise uses.

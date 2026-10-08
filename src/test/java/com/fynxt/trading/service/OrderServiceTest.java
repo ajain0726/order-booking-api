@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * queries and locking are exercised exactly as in production.
  */
 @SpringBootTest
-class OrderServiceTest {
+public class OrderServiceTest {
 
     @Autowired
     private OrderService orderService;

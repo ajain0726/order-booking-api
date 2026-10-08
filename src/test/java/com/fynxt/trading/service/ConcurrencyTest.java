@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * (e.g. 4+ pending orders, double fills, lost holding updates).
  */
 @SpringBootTest
-class ConcurrencyTest {
+public class ConcurrencyTest {
 
     private static final int THREADS = 16;
 

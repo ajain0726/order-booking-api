@@ -1,4 +1,4 @@
-# Walkthrough against the demo data in data.sql (fresh start).
+# Walkthrough against the demo data in data.sql (fresh start; same on H2 or the mysql profile).
 
 ### 4. Portfolio of seeded trader T001 -> AAPL 150, NVDA 100, TSLA 80; TECH 330
 GET http://localhost:8080/api/v1/traders/T001/portfolio

@@ -12,12 +12,18 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
 /**
  * A trade order. The state machine (PENDING -> FILLED | CANCELLED) lives here,
  * so no caller can move an order through an illegal transition.
+ *
+ * <p>Enums are stored as VARCHAR (with CHECK constraints in schema.sql) rather
+ * than Hibernate's default native MySQL ENUM, so adding a status is a data
+ * change, not an ALTER of the column type.
  */
 @Entity
 @Table(name = "orders")
@@ -35,6 +41,7 @@ public class Order {
     private Stock stock;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "side", nullable = false, length = 4)
     private OrderSide side;
 
@@ -42,6 +49,7 @@ public class Order {
     private long quantity;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 10)
     private OrderStatus status;
 

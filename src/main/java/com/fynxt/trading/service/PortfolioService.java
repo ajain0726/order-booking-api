@@ -41,9 +41,8 @@ public class PortfolioService {
         this.registrar = registrar;
         this.traderLock = traderLock;
         this.overlapAnalyzer = overlapAnalyzer;
-        this.tx = new TransactionTemplate(transactionManager);
-        this.readOnlyTx = new TransactionTemplate(transactionManager);
-        this.readOnlyTx.setReadOnly(true);
+        this.tx = Transactions.readCommitted(transactionManager);
+        this.readOnlyTx = Transactions.readOnly(transactionManager);
     }
 
     public Portfolio getPortfolio(String rawTraderId) {
