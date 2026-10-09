@@ -33,7 +33,8 @@ startup and are safe to re-run.
 database install, while the same `schema.sql` runs on real MySQL. H2's MySQL mode is not a
 perfect copy of MySQL (locking and isolation differ), so the business-rule and concurrency
 tests also run against a real MySQL 8.4 in Docker via Testcontainers (`MySql*Test`).
-`requests.http` contains a ready-to-run walkthrough (IntelliJ / VS Code REST Client).
+`CURLS.md` has a curl for every endpoint, in a sequence that works on a fresh start, with real
+responses. `requests.http` has the same walkthrough for IntelliJ / VS Code REST Client.
 
 ### Demo data
 
